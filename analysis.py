@@ -1,7 +1,7 @@
 """
-Weather Trend Forecasting — Basic Assessment
+Weather Trend Forecasting - Basic Assessment
 PM Accelerator | AI Engineering Intern Technical Assessment
-Author: [Your Name]
+Author: Rubia Massaud dos Santos
 Dataset: Global Weather Repository (Kaggle)
 """
 
@@ -106,7 +106,7 @@ def clean_data(df):
 def eda(df):
     print("\n[3] Exploratory Data Analysis...")
 
-    # ── Fig 1: Temperature distributions
+    # Fig 1: Temperature distributions
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     fig.suptitle("Temperature Distribution by Continent", fontsize=14, fontweight="bold", y=1.01)
 
@@ -125,7 +125,7 @@ def eda(df):
     plt.close()
     print("    → Saved 01_distributions.png")
 
-    # ── Fig 2: Monthly temperature trend per continent
+    # Fig 2: Monthly temperature trend per continent
     monthly = df.groupby(["year", "month", "continent"])["temperature_celsius"].mean().reset_index()
     monthly["date"] = pd.to_datetime(monthly[["year", "month"]].assign(day=1))
 
@@ -143,7 +143,7 @@ def eda(df):
     plt.close()
     print("    → Saved 02_monthly_temp_trend.png")
 
-    # ── Fig 3: Precipitation heatmap (city × month)
+    # Fig 3: Precipitation heatmap (city × month)
     piv = df.groupby(["location_name", "month"])["precip_mm"].mean().unstack()
     fig, ax = plt.subplots(figsize=(14, 6))
     sns.heatmap(piv, cmap="YlGnBu", linewidths=0.3, ax=ax, fmt=".1f", annot=True,
@@ -156,7 +156,7 @@ def eda(df):
     plt.close()
     print("    → Saved 03_precip_heatmap.png")
 
-    # ── Fig 4: Correlation matrix
+    # Fig 4: Correlation matrix
     corr_cols = ["temperature_celsius", "humidity", "precip_mm",
                  "wind_kph", "pressure_mb", "uv_index", "cloud", "visibility_km"]
     corr = df[corr_cols].corr()
@@ -170,7 +170,7 @@ def eda(df):
     plt.close()
     print("    → Saved 04_correlation_matrix.png")
 
-    # ── Fig 5: Seasonal boxplot
+    # Fig 5: Seasonal boxplot
     season_order = ["Spring", "Summer", "Autumn", "Winter"]
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     sns.boxplot(data=df, x="season", y="temperature_celsius", order=season_order,
@@ -189,7 +189,7 @@ def eda(df):
     plt.close()
     print("    → Saved 05_seasonal_boxplots.png")
 
-    # ── Fig 6: Top 5 hottest and coldest cities
+    # Fig 6: Top 5 hottest and coldest cities
     city_temp = df.groupby("location_name")["temperature_celsius"].mean().sort_values()
     top_bottom = pd.concat([city_temp.head(5), city_temp.tail(5)])
     colors_bar = [COLORS[0]] * 5 + [COLORS[1]] * 5
@@ -206,7 +206,7 @@ def eda(df):
     return monthly
 
 # ─────────────────────────────────────────────
-# 4. MODEL BUILDING — FORECASTING
+# 4. MODEL BUILDING - FORECASTING
 # ─────────────────────────────────────────────
 def build_models(df):
     print("\n[4] Model Building & Forecasting...")
@@ -226,7 +226,7 @@ def build_models(df):
 
     results = {}
 
-    # ── Model 1: Linear Regression (with time + Fourier seasonality)
+    # Model 1: Linear Regression (with time + Fourier seasonality)
     def make_features(idx):
         t = np.arange(len(idx))
         sin1 = np.sin(2 * np.pi * t / 365.25)
@@ -243,14 +243,14 @@ def build_models(df):
     lr_pred = lr.predict(X_test)
     results["Linear Regression"] = lr_pred
 
-    # ── Model 2: Exponential Smoothing (Holt-Winters)
+    # Model 2: Exponential Smoothing (Holt-Winters)
     hw = ExponentialSmoothing(train, trend="add", seasonal="add",
                               seasonal_periods=365, initialization_method="estimated")
     hw_fit = hw.fit(optimized=True)
     hw_pred = hw_fit.forecast(len(test)).values
     results["Holt-Winters"] = hw_pred
 
-    # ── Model 3: Random Forest (lag features)
+    # Model 3: Random Forest (lag features)
     def make_lag_features(series, n_lags=14):
         X, y = [], []
         vals = series.values
@@ -290,7 +290,7 @@ def build_models(df):
         metrics[name] = {"MAE": mae, "RMSE": rmse, "R2": r2}
         print(f"    {name:<22} {mae:>7.2f} {rmse:>7.2f} {r2:>7.4f}")
 
-    # ── Fig 7: Forecast comparison
+    # Fig 7: Forecast comparison
     fig, ax = plt.subplots(figsize=(15, 6))
     ax.plot(train.index[-90:], train.values[-90:], color="gray", linewidth=1.2, label="Train (last 90d)")
     ax.plot(test.index[:min_len], test_aligned, color="black", linewidth=2, label="Actual")
@@ -306,7 +306,7 @@ def build_models(df):
     plt.close()
     print("    → Saved 07_forecast_comparison.png")
 
-    # ── Fig 8: Metrics bar chart
+    # Fig 8: Metrics bar chart
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
     for ax, metric in zip(axes, ["MAE", "RMSE", "R2"]):
         vals = [metrics[m][metric] for m in metrics]
@@ -323,7 +323,7 @@ def build_models(df):
     plt.close()
     print("    → Saved 08_model_metrics.png")
 
-    # ── Future forecast: next 30 days using best model
+    # Future forecast: next 30 days using best model
     best_model = min(metrics, key=lambda m: metrics[m]["MAE"])
     print(f"\n    Best model by MAE: {best_model}")
 

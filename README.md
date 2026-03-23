@@ -17,7 +17,7 @@ This project analyzes the **Global Weather Repository** dataset (Kaggle) to fore
 - ✅ 30-day ahead forecast
 - ✅ Self-contained HTML report
 
-**Dataset:** [Global Weather Repository — Kaggle](https://www.kaggle.com/datasets/nelgiriyewithana/global-weather-repository/code)
+**Dataset:** [Global Weather Repository - Kaggle](https://www.kaggle.com/datasets/nelgiriyewithana/global-weather-repository/code)
 
 ---
 
@@ -73,7 +73,7 @@ python analysis.py
 ```
 
 ### 5. View the report
-Open `reports/weather_report.html` in any browser — it's fully self-contained (no internet needed).
+Open `reports/weather_report.html` in any browser, it's fully self-contained (no internet needed).
 
 ---
 
@@ -111,7 +111,7 @@ Train/Test split: 80% / 20%
 ## 🔍 Key Insights
 
 1. **Seasonality explains >70% of temperature variance** across all cities
-2. **City-level imputation** is critical — global means would corrupt localized climate signals
+2. **City-level imputation** is critical - global means would corrupt localized climate signals
 3. **Lag-based ML** (Random Forest) outperforms classical time series methods for short-horizon forecasting
 4. **Precipitation** is harder to forecast due to heavy-tailed, zero-inflated distribution
 
@@ -134,8 +134,8 @@ statsmodels (ExponentialSmoothing / Holt-Winters)
 ---
 
 ## 👤 Author
-**[Your Name]**
-- LinkedIn: [your-linkedin-url]
-- GitHub: [your-github-url]
+**Rubia Massaud**
+- LinkedIn: [https://www.linkedin.com/in/rubiamassaud/]
+- GitHub: [https://github.com/rubiamassaud]
 
 *Submitted for: PM Accelerator AI Engineering Intern — Spring/Summer 2026*
