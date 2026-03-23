@@ -108,12 +108,12 @@ def eda(df):
 
     # Fig 1: Temperature distributions
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Temperature Distribution by Continent", fontsize=14, fontweight="bold", y=1.01)
+    fig.suptitle("Temperature Distribution by Timezone", fontsize=14, fontweight="bold", y=1.01)
 
-    continents = df["continent"].unique()
+    timezones = df["timezone"].unique()
     for i, (ax, kind) in enumerate(zip(axes, ["temperature_celsius", "humidity"])):
-        for j, cont in enumerate(sorted(continents)):
-            sub = df[df["continent"] == cont][kind].dropna()
+        for j, tz in enumerate(sorted(timezones)):
+            sub = df[df["timezone"] == tz][kind].dropna()
             ax.hist(sub, bins=40, alpha=0.55, label=cont, color=COLORS[j % len(COLORS)])
         ax.set_xlabel(kind.replace("_", " ").title())
         ax.set_ylabel("Frequency")
@@ -125,16 +125,16 @@ def eda(df):
     plt.close()
     print("    → Saved 01_distributions.png")
 
-    # Fig 2: Monthly temperature trend per continent
-    monthly = df.groupby(["year", "month", "continent"])["temperature_celsius"].mean().reset_index()
+    # Fig 2: Monthly temperature trend per timezone
+    monthly = df.groupby(["year", "month", "timezone"])["temperature_celsius"].mean().reset_index()
     monthly["date"] = pd.to_datetime(monthly[["year", "month"]].assign(day=1))
 
     fig, ax = plt.subplots(figsize=(14, 5))
-    for j, cont in enumerate(sorted(df["continent"].unique())):
-        sub = monthly[monthly["continent"] == cont].sort_values("date")
-        ax.plot(sub["date"], sub["temperature_celsius"], label=cont,
+    for j, tz in enumerate(sorted(df["timezone"].unique())):
+        sub = monthly[monthly["timezone"] == tz].sort_values("date")
+        ax.plot(sub["date"], sub["temperature_celsius"], label=tz,
                 color=COLORS[j % len(COLORS)], linewidth=1.8)
-    ax.set_title("Monthly Average Temperature by Continent (2022–2024)", fontsize=13, fontweight="bold")
+    ax.set_title("Monthly Average Temperature by Timezone (2022–2024)", fontsize=13, fontweight="bold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Avg Temperature (°C)")
     ax.legend()
@@ -396,7 +396,7 @@ def save_summary(metrics):
         "",
         "VISUALIZATIONS GENERATED:",
         "  01_distributions.png       — Temp & Humidity distribution",
-        "  02_monthly_temp_trend.png  — Monthly avg temp by continent",
+        "  02_monthly_temp_trend.png  — Monthly avg temp by timezone",
         "  03_precip_heatmap.png      — Precipitation city × month",
         "  04_correlation_matrix.png  — Feature correlations",
         "  05_seasonal_boxplots.png   — Seasonal patterns",
@@ -423,3 +423,5 @@ if __name__ == "__main__":
     metrics = build_models(df)
     save_summary(metrics)
     print("\n✅  All done! Check the outputs/ and reports/ folders.")
+
+# %%
