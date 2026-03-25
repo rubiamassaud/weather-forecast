@@ -5,21 +5,19 @@ Author: Rubia Massaud dos Santos
 Dataset: Global Weather Repository (Kaggle)
 """
 
+import os
+import warnings
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+import seaborn as sns
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import seaborn as sns
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-import warnings, os
 
 warnings.filterwarnings("ignore")
 sns.set_theme(style="whitegrid", palette="muted")
@@ -30,6 +28,8 @@ os.makedirs(OUT, exist_ok=True)
 # ─────────────────────────────────────────────
 # 0. PM ACCELERATOR MISSION BANNER
 # ─────────────────────────────────────────────
+
+
 def print_banner():
     print("=" * 70)
     print("  PM ACCELERATOR")
@@ -43,20 +43,25 @@ def print_banner():
 # ─────────────────────────────────────────────
 # 1. LOAD DATA
 # ─────────────────────────────────────────────
+
+
 def load_data(path="data/GlobalWeatherRepository.csv"):
     print("[1] Loading dataset...")
     df = pd.read_csv(path, parse_dates=["last_updated"])
     print(f"    Shape: {df.shape[0]:,} rows × {df.shape[1]} columns")
-    print(f"    Date range: {df['last_updated'].min().date()} → {df['last_updated'].max().date()}")
-    print(f"    Cities: {df['location_name'].nunique()} | Countries: {df['country'].nunique()}")
+    print(
+        f"    Date range: {df['last_updated'].min().date()} → {df['last_updated'].max().date()}")
+    print(
+        f"    Cities: {df['location_name'].nunique()} | Countries: {df['country'].nunique()}")
     return df
 
 # ─────────────────────────────────────────────
 # 2. DATA CLEANING & PREPROCESSING
 # ─────────────────────────────────────────────
+
+
 def clean_data(df):
     print("\n[2] Data Cleaning & Preprocessing...")
-    raw_shape = df.shape
 
     # Missing values report
     miss = df.isnull().sum()
@@ -73,17 +78,16 @@ def clean_data(df):
 
     # Remove outliers with IQR for key columns
     outlier_cols = ["temperature_celsius", "humidity", "wind_kph", "precip_mm"]
-    total_removed = 0
+    original_len = len(df)
     for col in outlier_cols:
-        q1, q3 = df[col].quantile(0.01), df[col].quantile(0.99)
+        q1, q3 = df[col].quantile(0.25), df[col].quantile(0.75)
         iqr = q3 - q1
-        before = len(df)
         df = df[(df[col] >= q1 - 3 * iqr) & (df[col] <= q3 + 3 * iqr)]
-        total_removed += before - len(df)
 
     # Normalize humidity & UV
     df["humidity_norm"] = df["humidity"] / 100.0
-    df["uv_norm"] = df["uv_index"] / df["uv_index"].max()
+    uv_max = df["uv_index"].max()
+    df["uv_norm"] = df["uv_index"] / uv_max if uv_max > 0 else 0.0
 
     # Feature engineering
     df["month"] = df["last_updated"].dt.month
@@ -96,6 +100,7 @@ def clean_data(df):
         9: "Autumn", 10: "Autumn", 11: "Autumn"
     })
 
+    total_removed = original_len - len(df)
     print(f"    Shape after cleaning: {df.shape} (removed {total_removed} outlier rows)")
     print(f"    Missing values after: {df[num_cols].isnull().sum().sum()}")
     return df
@@ -103,18 +108,21 @@ def clean_data(df):
 # ─────────────────────────────────────────────
 # 3. EXPLORATORY DATA ANALYSIS
 # ─────────────────────────────────────────────
+
+
 def eda(df):
     print("\n[3] Exploratory Data Analysis...")
 
-    # Fig 1: Temperature distributions
+    # Fig 1: Temperature & Humidity distributions
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Temperature Distribution by Timezone", fontsize=14, fontweight="bold", y=1.01)
-
+    fig.suptitle("Temperature & Humidity Distribution by Timezone",
+                 fontsize=14, fontweight="bold", y=1.01)
     timezones = df["timezone"].unique()
-    for i, (ax, kind) in enumerate(zip(axes, ["temperature_celsius", "humidity"])):
+    for ax, kind in zip(axes, ["temperature_celsius", "humidity"]):
         for j, tz in enumerate(sorted(timezones)):
             sub = df[df["timezone"] == tz][kind].dropna()
-            ax.hist(sub, bins=40, alpha=0.55, label=cont, color=COLORS[j % len(COLORS)])
+            ax.hist(sub, bins=40, alpha=0.55, label=tz,
+                    color=COLORS[j % len(COLORS)])
         ax.set_xlabel(kind.replace("_", " ").title())
         ax.set_ylabel("Frequency")
         ax.legend(fontsize=8)
@@ -126,15 +134,16 @@ def eda(df):
     print("    → Saved 01_distributions.png")
 
     # Fig 2: Monthly temperature trend per timezone
-    monthly = df.groupby(["year", "month", "timezone"])["temperature_celsius"].mean().reset_index()
+    monthly = df.groupby(["year", "month", "timezone"])[
+        "temperature_celsius"].mean().reset_index()
     monthly["date"] = pd.to_datetime(monthly[["year", "month"]].assign(day=1))
-
     fig, ax = plt.subplots(figsize=(14, 5))
     for j, tz in enumerate(sorted(df["timezone"].unique())):
         sub = monthly[monthly["timezone"] == tz].sort_values("date")
         ax.plot(sub["date"], sub["temperature_celsius"], label=tz,
                 color=COLORS[j % len(COLORS)], linewidth=1.8)
-    ax.set_title("Monthly Average Temperature by Timezone (2022–2024)", fontsize=13, fontweight="bold")
+    ax.set_title("Monthly Average Temperature by Timezone",
+                 fontsize=13, fontweight="bold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Avg Temperature (°C)")
     ax.legend()
@@ -148,7 +157,8 @@ def eda(df):
     fig, ax = plt.subplots(figsize=(14, 6))
     sns.heatmap(piv, cmap="YlGnBu", linewidths=0.3, ax=ax, fmt=".1f", annot=True,
                 cbar_kws={"label": "Avg Precip (mm)"})
-    ax.set_title("Average Monthly Precipitation by City", fontsize=13, fontweight="bold")
+    ax.set_title("Average Monthly Precipitation by City",
+                 fontsize=13, fontweight="bold")
     ax.set_xlabel("Month")
     ax.set_ylabel("City")
     plt.tight_layout()
@@ -170,7 +180,7 @@ def eda(df):
     plt.close()
     print("    → Saved 04_correlation_matrix.png")
 
-    # Fig 5: Seasonal boxplot
+    # Fig 5: Seasonal boxplots
     season_order = ["Spring", "Summer", "Autumn", "Winter"]
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     sns.boxplot(data=df, x="season", y="temperature_celsius", order=season_order,
@@ -178,7 +188,6 @@ def eda(df):
     axes[0].set_title("Temperature by Season", fontsize=12, fontweight="bold")
     axes[0].set_xlabel("Season")
     axes[0].set_ylabel("Temperature (°C)")
-
     sns.boxplot(data=df, x="season", y="precip_mm", order=season_order,
                 palette="Set3", ax=axes[1])
     axes[1].set_title("Precipitation by Season", fontsize=12, fontweight="bold")
@@ -190,12 +199,14 @@ def eda(df):
     print("    → Saved 05_seasonal_boxplots.png")
 
     # Fig 6: Top 5 hottest and coldest cities
-    city_temp = df.groupby("location_name")["temperature_celsius"].mean().sort_values()
+    city_temp = df.groupby("location_name")[
+        "temperature_celsius"].mean().sort_values()
     top_bottom = pd.concat([city_temp.head(5), city_temp.tail(5)])
     colors_bar = [COLORS[0]] * 5 + [COLORS[1]] * 5
     fig, ax = plt.subplots(figsize=(10, 5))
     top_bottom.plot(kind="barh", ax=ax, color=colors_bar)
-    ax.set_title("Coldest vs Hottest Cities (Avg Temperature)", fontsize=12, fontweight="bold")
+    ax.set_title("Coldest vs Hottest Cities (Avg Temperature)",
+                 fontsize=12, fontweight="bold")
     ax.set_xlabel("Avg Temperature (°C)")
     ax.axvline(0, color="gray", linestyle="--", linewidth=0.8)
     plt.tight_layout()
@@ -208,10 +219,13 @@ def eda(df):
 # ─────────────────────────────────────────────
 # 4. MODEL BUILDING - FORECASTING
 # ─────────────────────────────────────────────
+
+
 def build_models(df):
     print("\n[4] Model Building & Forecasting...")
 
-    # Focus: daily avg temperature for New York
+    # Select city with most daily observations (minimum 60)
+    MIN_OBS = 60
     city = "New York"
     ts = (df[df["location_name"] == city]
           .set_index("last_updated")
@@ -221,12 +235,37 @@ def build_models(df):
 
     print(f"    Time series: {city} | {len(ts)} daily observations")
 
+    if len(ts) < MIN_OBS:
+        city_counts = (df.groupby("location_name")
+                       .apply(lambda x: x.set_index("last_updated")
+                              .resample("D")["temperature_celsius"]
+                              .mean().dropna().shape[0]))
+        best_city = city_counts[city_counts >= MIN_OBS].idxmax() \
+            if (city_counts >= MIN_OBS).any() else None
+
+        if best_city is None:
+            print(f"    ⚠ No city has enough data (min {MIN_OBS} obs). Skipping models.")
+            return {}
+
+        print(f"    ⚠ '{city}' has too few observations. Switching to '{best_city}'.")
+        city = best_city
+        ts = (df[df["location_name"] == city]
+              .set_index("last_updated")
+              .resample("D")["temperature_celsius"]
+              .mean()
+              .dropna())
+        print(f"    Time series: {city} | {len(ts)} daily observations")
+
     train_size = int(len(ts) * 0.8)
     train, test = ts.iloc[:train_size], ts.iloc[train_size:]
 
+    if len(train) == 0 or len(test) == 0:
+        print(f"    ⚠ Train ({len(train)}) or test ({len(test)}) set is empty. Skipping.")
+        return {}
+
     results = {}
 
-    # Model 1: Linear Regression (with time + Fourier seasonality)
+    # ── Model 1: Linear Regression (time + Fourier seasonality) ──────────────
     def make_features(idx):
         t = np.arange(len(idx))
         sin1 = np.sin(2 * np.pi * t / 365.25)
@@ -236,21 +275,35 @@ def build_models(df):
         return np.column_stack([t, sin1, cos1, sin2, cos2])
 
     X_train = make_features(train.index)
-    X_test = make_features(pd.date_range(train.index[-1] + pd.Timedelta(days=1), periods=len(test)))
+    X_test = make_features(
+        pd.date_range(train.index[-1] + pd.Timedelta(days=1), periods=len(test)))
 
     lr = LinearRegression()
     lr.fit(X_train, train.values)
     lr_pred = lr.predict(X_test)
     results["Linear Regression"] = lr_pred
 
-    # Model 2: Exponential Smoothing (Holt-Winters)
-    hw = ExponentialSmoothing(train, trend="add", seasonal="add",
-                              seasonal_periods=365, initialization_method="estimated")
-    hw_fit = hw.fit(optimized=True)
-    hw_pred = hw_fit.forecast(len(test)).values
+    # ── Model 2: Exponential Smoothing (Holt-Winters) ────────────────────────
+    sp = min(365, len(train) // 2)
+
+    try:
+        hw = ExponentialSmoothing(
+            train,
+            trend="add",
+            seasonal="add",
+            seasonal_periods=sp,
+            initialization_method="estimated"
+        )
+        hw_fit = hw.fit(optimized=True)
+        hw_pred = hw_fit.forecast(len(test)).values
+    except Exception as e:
+        print(f"    ⚠ Holt-Winters failed ({e}). Using fallback.")
+        hw_pred = np.tile(train.values[-sp:], len(test) // sp + 1)[:len(test)]
+        hw_fit = None
+
     results["Holt-Winters"] = hw_pred
 
-    # Model 3: Random Forest (lag features)
+    # ── Model 3: Random Forest (lag features) ────────────────────────────────
     def make_lag_features(series, n_lags=14):
         X, y = [], []
         vals = series.values
@@ -269,35 +322,38 @@ def build_models(df):
     rf.fit(Xr_train, yr_train)
     rf_pred = rf.predict(Xr_test)
 
-    # Align lengths
+    # ── Align lengths & compute metrics ──────────────────────────────────────
     min_len = min(len(test), len(rf_pred), len(lr_pred), len(hw_pred))
     test_aligned = test.values[:min_len]
 
     results_aligned = {
         "Linear Regression": lr_pred[:min_len],
-        "Holt-Winters": hw_pred[:min_len],
-        "Random Forest": rf_pred[:min_len],
+        "Holt-Winters":      hw_pred[:min_len],
+        "Random Forest":     rf_pred[:min_len],
     }
 
-    # Metrics
     print(f"\n    {'Model':<22} {'MAE':>7} {'RMSE':>7} {'R²':>7}")
     print("    " + "-" * 45)
     metrics = {}
     for name, pred in results_aligned.items():
-        mae = mean_absolute_error(test_aligned, pred)
+        mae  = mean_absolute_error(test_aligned, pred)
         rmse = np.sqrt(mean_squared_error(test_aligned, pred))
-        r2 = r2_score(test_aligned, pred)
+        r2   = r2_score(test_aligned, pred)
         metrics[name] = {"MAE": mae, "RMSE": rmse, "R2": r2}
         print(f"    {name:<22} {mae:>7.2f} {rmse:>7.2f} {r2:>7.4f}")
 
-    # Fig 7: Forecast comparison
-    fig, ax = plt.subplots(figsize=(15, 6))
-    ax.plot(train.index[-90:], train.values[-90:], color="gray", linewidth=1.2, label="Train (last 90d)")
-    ax.plot(test.index[:min_len], test_aligned, color="black", linewidth=2, label="Actual")
+    # ── Fig 7: Forecast comparison ────────────────────────────────────────────
     model_colors = [COLORS[0], COLORS[2], COLORS[1]]
+    fig, ax = plt.subplots(figsize=(15, 6))
+    ax.plot(train.index[-90:], train.values[-90:],
+            color="gray", linewidth=1.2, label="Train (last 90d)")
+    ax.plot(test.index[:min_len], test_aligned,
+            color="black", linewidth=2, label="Actual")
     for (name, pred), col in zip(results_aligned.items(), model_colors):
-        ax.plot(test.index[:min_len], pred, linewidth=1.5, linestyle="--", label=name, color=col, alpha=0.85)
-    ax.set_title(f"Temperature Forecast — {city} (Test Period)", fontsize=13, fontweight="bold")
+        ax.plot(test.index[:min_len], pred, linewidth=1.5,
+                linestyle="--", label=name, color=col, alpha=0.85)
+    ax.set_title(f"Temperature Forecast — {city} (Test Period)",
+                 fontsize=13, fontweight="bold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Temperature (°C)")
     ax.legend()
@@ -306,44 +362,65 @@ def build_models(df):
     plt.close()
     print("    → Saved 07_forecast_comparison.png")
 
-    # Fig 8: Metrics bar chart
+    # ── Fig 8: Metrics bar chart ──────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
     for ax, metric in zip(axes, ["MAE", "RMSE", "R2"]):
         vals = [metrics[m][metric] for m in metrics]
-        bars = ax.bar(list(metrics.keys()), vals, color=model_colors, edgecolor="white", linewidth=0.5)
+        bars = ax.bar(list(metrics.keys()), vals,
+                      color=model_colors, edgecolor="white", linewidth=0.5)
         ax.set_title(metric, fontweight="bold")
         ax.set_ylabel(metric)
         ax.tick_params(axis="x", rotation=15)
         for bar, v in zip(bars, vals):
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() * 0.98,
-                    f"{v:.3f}", ha="center", va="top", fontsize=9, color="white", fontweight="bold")
+                    f"{v:.3f}", ha="center", va="top", fontsize=9,
+                    color="white", fontweight="bold")
     fig.suptitle("Model Evaluation Metrics", fontsize=13, fontweight="bold")
     plt.tight_layout()
     plt.savefig(f"{OUT}/08_model_metrics.png", dpi=150, bbox_inches="tight")
     plt.close()
     print("    → Saved 08_model_metrics.png")
 
-    # Future forecast: next 30 days using best model
+    # ── Future Forecast: next 30 days ─────────────────────────────────────────
+    if not metrics:
+        print("    ⚠ No metrics available. Skipping forecast.")
+        return metrics
+
     best_model = min(metrics, key=lambda m: metrics[m]["MAE"])
     print(f"\n    Best model by MAE: {best_model}")
 
-    last_window = ts.values[-N_LAGS:]
-    future_preds = []
-    for _ in range(30):
-        p = rf.predict(last_window.reshape(1, -1))[0]
-        future_preds.append(p)
-        last_window = np.append(last_window[1:], p)
+    future_dates = pd.date_range(
+        ts.index[-1] + pd.Timedelta(days=1), periods=30)
 
-    future_dates = pd.date_range(ts.index[-1] + pd.Timedelta(days=1), periods=30)
+    if best_model == "Random Forest":
+        last_window = ts.values[-N_LAGS:]
+        future_preds = []
+        for _ in range(30):
+            p = rf.predict(last_window.reshape(1, -1))[0]
+            future_preds.append(p)
+            last_window = np.append(last_window[1:], p)
+
+    elif best_model == "Holt-Winters" and hw_fit is not None:
+        future_preds = hw_fit.forecast(30).values.tolist()
+
+    else:  # Linear Regression (or HW fallback)
+        future_preds = lr.predict(make_features(future_dates)).tolist()
+
     fig, ax = plt.subplots(figsize=(13, 5))
-    ax.plot(ts.index[-60:], ts.values[-60:], color="gray", linewidth=1.5, label="Historical (60d)")
-    ax.plot(future_dates, future_preds, color=COLORS[1], linewidth=2,
-            linestyle="--", marker="o", markersize=4, label="30-Day Forecast (RF)")
-    ax.axvline(ts.index[-1], color="black", linestyle=":", linewidth=1)
-    ax.set_title(f"30-Day Temperature Forecast — {city} (Random Forest)", fontsize=13, fontweight="bold")
+    ax.plot(ts.index[-60:], ts.values[-60:],
+            color="gray", linewidth=1.5, label="Historical (60d)")
+    ax.plot(future_dates, future_preds,
+            color=COLORS[1], linewidth=2, linestyle="--",
+            marker="o", markersize=4,
+            label=f"30-Day Forecast ({best_model})")
+    ax.axvline(ts.index[-1], color="black", linestyle=":", linewidth=1,
+               label="Forecast Start")
+    ax.set_title(f"30-Day Temperature Forecast — {city} ({best_model})",
+                 fontsize=13, fontweight="bold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Temperature (°C)")
     ax.legend()
+    fig.autofmt_xdate()
     plt.tight_layout()
     plt.savefig(f"{OUT}/09_future_forecast.png", dpi=150, bbox_inches="tight")
     plt.close()
@@ -352,9 +429,12 @@ def build_models(df):
     return metrics
 
 # ─────────────────────────────────────────────
-# 5. SUMMARY REPORT (text)
+# 5. SUMMARY REPORT
 # ─────────────────────────────────────────────
+
+
 def save_summary(metrics):
+    os.makedirs("reports", exist_ok=True)
     lines = [
         "=" * 65,
         "  PM ACCELERATOR — Weather Trend Forecasting | Assessment Report",
@@ -366,33 +446,34 @@ def save_summary(metrics):
         "  https://www.pmaccelerator.io/",
         "",
         "DATASET: Global Weather Repository (Kaggle)",
-        "  Cities: 15 | Date range: 2022-01-01 to 2024-12-31",
-        "  Features: 27 | Records: ~16,000",
+        "  Features: 41 | Records: ~131,000",
         "",
         "DATA CLEANING:",
         "  • Handled missing values with city-level median imputation",
-        "  • Removed outliers via 1st–99th percentile IQR filter",
-        "  • Normalized humidity and UV index (0–1 scale)",
+        "  • Removed outliers via IQR filter (Q1/Q3 ± 3×IQR)",
+        "  • Normalized humidity (0–1) and UV index (0–1)",
         "  • Engineered: month, day_of_year, year, season",
         "",
         "EDA FINDINGS:",
-        "  • Clear seasonality in all cities (NH summer = Jun–Aug)",
-        "  • Dubai and Singapore show highest avg temperatures",
-        "  • Moscow and Toronto show strongest seasonal swings",
-        "  • Negative correlation: temperature ↔ humidity (r ≈ -0.30)",
-        "  • Positive correlation: UV index ↔ temperature (r ≈ +0.45)",
+        "  • Clear seasonality observed across all cities",
+        "  • Negative correlation: temperature ↔ humidity",
+        "  • Positive correlation: UV index ↔ temperature",
         "",
-        "FORECASTING MODELS (New York daily temperature):",
+        "FORECASTING MODELS:",
         f"  {'Model':<22} {'MAE':>7} {'RMSE':>7} {'R²':>7}",
         "  " + "-" * 42,
     ]
-    for name, m in metrics.items():
-        lines.append(f"  {name:<22} {m['MAE']:>7.2f} {m['RMSE']:>7.2f} {m['R2']:>7.4f}")
 
-    best = min(metrics, key=lambda x: metrics[x]["MAE"])
+    if metrics:
+        for name, m in metrics.items():
+            lines.append(
+                f"  {name:<22} {m['MAE']:>7.2f} {m['RMSE']:>7.2f} {m['R2']:>7.4f}")
+        best = min(metrics, key=lambda x: metrics[x]["MAE"])
+        lines += ["", f"  Best model: {best} (lowest MAE)"]
+    else:
+        lines.append("  No metrics available.")
+
     lines += [
-        "",
-        f"  Best model: {best} (lowest MAE)",
         "",
         "VISUALIZATIONS GENERATED:",
         "  01_distributions.png       — Temp & Humidity distribution",
@@ -407,7 +488,8 @@ def save_summary(metrics):
         "",
         "=" * 65,
     ]
-    with open("reports/summary_report.txt", "w") as f:
+
+    with open("reports/summary_report.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     print("\n    → Saved reports/summary_report.txt")
 
@@ -423,5 +505,3 @@ if __name__ == "__main__":
     metrics = build_models(df)
     save_summary(metrics)
     print("\n✅  All done! Check the outputs/ and reports/ folders.")
-
-# %%

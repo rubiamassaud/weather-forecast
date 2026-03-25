@@ -1,0 +1,44 @@
+=================================================================
+  PM ACCELERATOR — Weather Trend Forecasting | Assessment Report
+=================================================================
+
+MISSION:
+  PM Accelerator empowers aspiring AI product managers with
+  real-world skills, mentorship, and hands-on AI experience.
+  https://www.pmaccelerator.io/
+
+DATASET: Global Weather Repository (Kaggle)
+  Features: 41 | Records: ~131,000
+
+DATA CLEANING:
+  • Handled missing values with city-level median imputation
+  • Removed outliers via IQR filter (Q1/Q3 ± 3×IQR)
+  • Normalized humidity (0–1) and UV index (0–1)
+  • Engineered: month, day_of_year, year, season
+
+EDA FINDINGS:
+  • Clear seasonality observed across all cities
+  • Negative correlation: temperature ↔ humidity
+  • Positive correlation: UV index ↔ temperature
+
+FORECASTING MODELS:
+  Model                      MAE    RMSE      R²
+  ------------------------------------------
+  Linear Regression        12.95   13.45 -19.0664
+  Holt-Winters             14.30   15.40 -25.3074
+  Random Forest             1.66    2.26  0.4347
+
+  Best model: Random Forest (lowest MAE)
+
+VISUALIZATIONS GENERATED:
+  01_distributions.png       — Temp & Humidity distribution
+  02_monthly_temp_trend.png  — Monthly avg temp by timezone
+  03_precip_heatmap.png      — Precipitation city × month
+  04_correlation_matrix.png  — Feature correlations
+  05_seasonal_boxplots.png   — Seasonal patterns
+  06_hottest_coldest.png     — City temperature ranking
+  07_forecast_comparison.png — Model forecasts vs actual
+  08_model_metrics.png       — MAE / RMSE / R² bar chart
+  09_future_forecast.png     — 30-day ahead forecast
+
+=================================================================
