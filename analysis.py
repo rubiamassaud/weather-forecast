@@ -101,7 +101,8 @@ def clean_data(df):
     })
 
     total_removed = original_len - len(df)
-    print(f"    Shape after cleaning: {df.shape} (removed {total_removed} outlier rows)")
+    print(
+        f"    Shape after cleaning: {df.shape} (removed {total_removed} outlier rows)")
     print(f"    Missing values after: {df[num_cols].isnull().sum().sum()}")
     return df
 
@@ -114,55 +115,79 @@ def eda(df):
     print("\n[3] Exploratory Data Analysis...")
 
     # Fig 1: Temperature & Humidity distributions
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Temperature & Humidity Distribution by Timezone",
-                 fontsize=14, fontweight="bold", y=1.01)
-    timezones = df["timezone"].unique()
-    for ax, kind in zip(axes, ["temperature_celsius", "humidity"]):
-        for j, tz in enumerate(sorted(timezones)):
-            sub = df[df["timezone"] == tz][kind].dropna()
-            ax.hist(sub, bins=40, alpha=0.55, label=tz,
-                    color=COLORS[j % len(COLORS)])
-        ax.set_xlabel(kind.replace("_", " ").title())
-        ax.set_ylabel("Frequency")
-        ax.legend(fontsize=8)
-    axes[0].set_title("Temperature (°C)")
-    axes[1].set_title("Humidity (%)")
+    df['region'] = df['timezone'].str.split('/').str[0]
+    sns.set_style("ticks")
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    fig.suptitle("Temperature & Humidity Distribution by Region",
+                 fontsize=15, fontweight="bold", y=1.02)
+    regions = sorted(df["region"].unique())
+    high_contrast_palette = ["#1E90FF", "#E31A1C", "#FF7F00",
+                             "#33A02C", "#6A3D9A", "#00CACA", "#FFD700", "#FF1493"]
+    color_map = {reg: high_contrast_palette[i % len(
+        high_contrast_palette)] for i, reg in enumerate(regions)}
+    metrics = [("temperature_celsius", "Temperature (°C)"),
+               ("humidity", "Humidity (%)")]
+    for i, (col, label) in enumerate(metrics):
+        sns.histplot(data=df, x=col, hue="region", kde=True, element="step",
+                     palette=color_map, common_norm=False, alpha=0.3, ax=axes[i],
+                     legend=(i == 1))
+
+        axes[i].set_title(label, fontsize=14, pad=10)
+        axes[i].set_xlabel(label, fontsize=11)
+        axes[i].set_ylabel("Frequency", fontsize=11)
+        axes[i].grid(axis='y', linestyle='--', alpha=0.5)
+
+    leg = axes[1].get_legend()
+    if leg:
+        leg.set_bbox_to_anchor((1.05, 1))
+        leg.set_loc('upper left')
+        leg.set_title("Region", prop={'size': 12, 'weight': 'bold'})
+        plt.setp(leg.get_texts(), fontsize='10')
+
     plt.tight_layout()
     plt.savefig(f"{OUT}/01_distributions.png", dpi=150, bbox_inches="tight")
     plt.close()
+    sns.set_style("whitegrid")
     print("    → Saved 01_distributions.png")
 
-    # Fig 2: Monthly temperature trend per timezone
-    monthly = df.groupby(["year", "month", "timezone"])[
+    # Fig 2: Monthly temperature trend per region
+    df['region'] = df['timezone'].str.split('/').str[0]
+    monthly = df.groupby(["year", "month", "region"])[
         "temperature_celsius"].mean().reset_index()
     monthly["date"] = pd.to_datetime(monthly[["year", "month"]].assign(day=1))
     fig, ax = plt.subplots(figsize=(14, 5))
-    for j, tz in enumerate(sorted(df["timezone"].unique())):
-        sub = monthly[monthly["timezone"] == tz].sort_values("date")
+    for j, tz in enumerate(sorted(df["region"].unique())):
+        sub = monthly[monthly["region"] == tz].sort_values("date")
         ax.plot(sub["date"], sub["temperature_celsius"], label=tz,
                 color=COLORS[j % len(COLORS)], linewidth=1.8)
-    ax.set_title("Monthly Average Temperature by Timezone",
+    ax.set_title("Monthly Average Temperature by Region",
                  fontsize=13, fontweight="bold")
     ax.set_xlabel("Date")
     ax.set_ylabel("Avg Temperature (°C)")
     ax.legend()
     plt.tight_layout()
-    plt.savefig(f"{OUT}/02_monthly_temp_trend.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/02_monthly_temp_trend.png",
+                dpi=150, bbox_inches="tight")
     plt.close()
     print("    → Saved 02_monthly_temp_trend.png")
 
     # Fig 3: Precipitation heatmap (city × month)
-    piv = df.groupby(["location_name", "month"])["precip_mm"].mean().unstack()
-    fig, ax = plt.subplots(figsize=(14, 6))
-    sns.heatmap(piv, cmap="YlGnBu", linewidths=0.3, ax=ax, fmt=".1f", annot=True,
-                cbar_kws={"label": "Avg Precip (mm)"})
-    ax.set_title("Average Monthly Precipitation by City",
-                 fontsize=13, fontweight="bold")
-    ax.set_xlabel("Month")
-    ax.set_ylabel("City")
+    top_cities = df.groupby("location_name")[
+        "precip_mm"].mean().nlargest(20).index
+    df_top = df[df["location_name"].isin(top_cities)]
+    piv = df_top.groupby(["location_name", "month"])[
+        "precip_mm"].mean().unstack()
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sns.heatmap(piv, cmap="YlGnBu", linewidths=0.5, ax=ax, fmt=".2f", annot=True,
+                annot_kws={"size": 9}, cbar_kws={"shrink": 0.8, "label": "Avg Precip (mm)"})
+
+    ax.set_title("Average Monthly Precipitation - Top 20 Rainiest Cities",
+                 fontsize=14, fontweight="bold", pad=15)
+    ax.set_xlabel("Month (1=Jan, 12=Dec)", fontsize=11)
+    ax.set_ylabel("City", fontsize=11)
+    plt.yticks(rotation=0)
     plt.tight_layout()
-    plt.savefig(f"{OUT}/03_precip_heatmap.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/03_precip_heatmap.png", dpi=200, bbox_inches="tight")
     plt.close()
     print("    → Saved 03_precip_heatmap.png")
 
@@ -170,31 +195,47 @@ def eda(df):
     corr_cols = ["temperature_celsius", "humidity", "precip_mm",
                  "wind_kph", "pressure_mb", "uv_index", "cloud", "visibility_km"]
     corr = df[corr_cols].corr()
-    fig, ax = plt.subplots(figsize=(9, 7))
+    fig, ax = plt.subplots(figsize=(10, 8))
     mask = np.triu(np.ones_like(corr, dtype=bool))
     sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap="coolwarm",
-                center=0, ax=ax, square=True, linewidths=0.4)
-    ax.set_title("Feature Correlation Matrix", fontsize=13, fontweight="bold")
+                center=0, ax=ax, square=True, linewidths=0.8,
+                cbar_kws={"shrink": 0.8}, annot_kws={"size": 10})
+
+    clean_labels = [c.replace('_', ' ').title() for c in corr_cols]
+    ax.set_xticklabels(clean_labels, rotation=45, ha="right")
+    ax.set_yticklabels(clean_labels, rotation=0)
+    ax.grid(False)
+    ax.set_title("Feature Correlation Matrix",
+                 fontsize=15, fontweight="bold", pad=20)
     plt.tight_layout()
-    plt.savefig(f"{OUT}/04_correlation_matrix.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/04_correlation_matrix.png",
+                dpi=200, bbox_inches="tight")
     plt.close()
     print("    → Saved 04_correlation_matrix.png")
 
     # Fig 5: Seasonal boxplots
     season_order = ["Spring", "Summer", "Autumn", "Winter"]
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    sns.boxplot(data=df, x="season", y="temperature_celsius", order=season_order,
-                palette="Set2", ax=axes[0])
-    axes[0].set_title("Temperature by Season", fontsize=12, fontweight="bold")
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    sns.violinplot(data=df, x="season", y="temperature_celsius", order=season_order,
+                   palette="Set2", ax=axes[0], inner="quartile", cut=0)
+    axes[0].set_title("Temperature Distribution by Season",
+                      fontsize=13, fontweight="bold")
     axes[0].set_xlabel("Season")
     axes[0].set_ylabel("Temperature (°C)")
-    sns.boxplot(data=df, x="season", y="precip_mm", order=season_order,
-                palette="Set3", ax=axes[1])
-    axes[1].set_title("Precipitation by Season", fontsize=12, fontweight="bold")
-    axes[1].set_xlabel("Season")
+    sns.boxenplot(data=df, x="season", y="precip_mm", order=season_order,
+                  palette="Set3", ax=axes[1])
+    percentile_95 = df["precip_mm"].quantile(0.95)
+    axes[1].set_ylim(-0.1, percentile_95 * 1.5)
+    axes[1].set_title("Precipitation by Season",
+                      fontsize=13, fontweight="bold")
     axes[1].set_ylabel("Precipitation (mm)")
+
+    for ax in axes:
+        ax.set_xlabel("Season")
+        ax.grid(axis="y", linestyle="--", alpha=0.6)
+
     plt.tight_layout()
-    plt.savefig(f"{OUT}/05_seasonal_boxplots.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/05_seasonal_boxplots.png", dpi=200)
     plt.close()
     print("    → Saved 05_seasonal_boxplots.png")
 
@@ -210,7 +251,8 @@ def eda(df):
     ax.set_xlabel("Avg Temperature (°C)")
     ax.axvline(0, color="gray", linestyle="--", linewidth=0.8)
     plt.tight_layout()
-    plt.savefig(f"{OUT}/06_hottest_coldest_cities.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/06_hottest_coldest_cities.png",
+                dpi=150, bbox_inches="tight")
     plt.close()
     print("    → Saved 06_hottest_coldest_cities.png")
 
@@ -244,10 +286,12 @@ def build_models(df):
             if (city_counts >= MIN_OBS).any() else None
 
         if best_city is None:
-            print(f"    ⚠ No city has enough data (min {MIN_OBS} obs). Skipping models.")
+            print(
+                f"    ⚠ No city has enough data (min {MIN_OBS} obs). Skipping models.")
             return {}
 
-        print(f"    ⚠ '{city}' has too few observations. Switching to '{best_city}'.")
+        print(
+            f"    ⚠ '{city}' has too few observations. Switching to '{best_city}'.")
         city = best_city
         ts = (df[df["location_name"] == city]
               .set_index("last_updated")
@@ -260,7 +304,8 @@ def build_models(df):
     train, test = ts.iloc[:train_size], ts.iloc[train_size:]
 
     if len(train) == 0 or len(test) == 0:
-        print(f"    ⚠ Train ({len(train)}) or test ({len(test)}) set is empty. Skipping.")
+        print(
+            f"    ⚠ Train ({len(train)}) or test ({len(test)}) set is empty. Skipping.")
         return {}
 
     results = {}
@@ -318,7 +363,8 @@ def build_models(df):
     Xr_train, Xr_test = X_all[:split], X_all[split:]
     yr_train, yr_test = y_all[:split], y_all[split:]
 
-    rf = RandomForestRegressor(n_estimators=150, max_depth=8, random_state=42, n_jobs=-1)
+    rf = RandomForestRegressor(
+        n_estimators=150, max_depth=8, random_state=42, n_jobs=-1)
     rf.fit(Xr_train, yr_train)
     rf_pred = rf.predict(Xr_test)
 
@@ -336,9 +382,9 @@ def build_models(df):
     print("    " + "-" * 45)
     metrics = {}
     for name, pred in results_aligned.items():
-        mae  = mean_absolute_error(test_aligned, pred)
+        mae = mean_absolute_error(test_aligned, pred)
         rmse = np.sqrt(mean_squared_error(test_aligned, pred))
-        r2   = r2_score(test_aligned, pred)
+        r2 = r2_score(test_aligned, pred)
         metrics[name] = {"MAE": mae, "RMSE": rmse, "R2": r2}
         print(f"    {name:<22} {mae:>7.2f} {rmse:>7.2f} {r2:>7.4f}")
 
@@ -358,80 +404,97 @@ def build_models(df):
     ax.set_ylabel("Temperature (°C)")
     ax.legend()
     plt.tight_layout()
-    plt.savefig(f"{OUT}/07_forecast_comparison.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/07_forecast_comparison.png",
+                dpi=150, bbox_inches="tight")
     plt.close()
     print("    → Saved 07_forecast_comparison.png")
 
     # ── Fig 8: Metrics bar chart ──────────────────────────────────────────────
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
-    for ax, metric in zip(axes, ["MAE", "RMSE", "R2"]):
-        vals = [metrics[m][metric] for m in metrics]
-        bars = ax.bar(list(metrics.keys()), vals,
-                      color=model_colors, edgecolor="white", linewidth=0.5)
-        ax.set_title(metric, fontweight="bold")
-        ax.set_ylabel(metric)
-        ax.tick_params(axis="x", rotation=15)
-        for bar, v in zip(bars, vals):
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() * 0.98,
-                    f"{v:.3f}", ha="center", va="top", fontsize=9,
-                    color="white", fontweight="bold")
-    fig.suptitle("Model Evaluation Metrics", fontsize=13, fontweight="bold")
+    metrics_list = ["MAE", "RMSE", "R2"]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    for i, metric in enumerate(metrics_list):
+        ax = axes[i]
+        models = list(metrics.keys())
+        vals = [metrics[m][metric] for m in models]
+
+        bars = ax.bar(models, vals, color=model_colors,
+                      edgecolor="black", linewidth=0.7)
+        ax.set_title(f"Model {metric}", fontweight="bold", fontsize=12, pad=15)
+        ax.tick_params(axis="x", rotation=25)
+
+        if metric == "R2":
+            ax.axhline(0, color='black', linewidth=0.8, linestyle='-')
+
+        for bar in bars:
+            height = bar.get_height()
+            va = 'top' if height < 0 else 'bottom'
+            offset = -0.3 if height < 0 else 0.3
+
+            ax.text(bar.get_x() + bar.get_width()/2, height + offset,
+                    f'{height:.2f}', ha='center', va=va,
+                    fontweight='bold', fontsize=10, color='black')
+
+    fig.suptitle("Model Evaluation Metrics - Performance Comparison",
+                 fontsize=15, fontweight="bold", y=1.05)
+
     plt.tight_layout()
-    plt.savefig(f"{OUT}/08_model_metrics.png", dpi=150, bbox_inches="tight")
+    plt.savefig(f"{OUT}/08_model_metrics.png", dpi=200, bbox_inches="tight")
     plt.close()
     print("    → Saved 08_model_metrics.png")
 
     # ── Future Forecast: next 30 days ─────────────────────────────────────────
-    if not metrics:
-        print("    ⚠ No metrics available. Skipping forecast.")
-        return metrics
+    best_model_name = min(metrics, key=lambda m: metrics[m]["MAE"])
+    print(f"\n    Deploying best model for forecasting: {best_model_name}")
 
-    best_model = min(metrics, key=lambda m: metrics[m]["MAE"])
-    print(f"\n    Best model by MAE: {best_model}")
+    last_date = ts.index[-1]
+    future_dates = pd.date_range(last_date + pd.Timedelta(days=1), periods=30)
+    future_preds = []
 
-    future_dates = pd.date_range(
-        ts.index[-1] + pd.Timedelta(days=1), periods=30)
-
-    if best_model == "Random Forest":
+    if best_model_name == "Random Forest":
         last_window = ts.values[-N_LAGS:]
-        future_preds = []
         for _ in range(30):
             p = rf.predict(last_window.reshape(1, -1))[0]
             future_preds.append(p)
             last_window = np.append(last_window[1:], p)
 
-    elif best_model == "Holt-Winters" and hw_fit is not None:
+    elif best_model_name == "Holt-Winters" and hw_fit is not None:
         future_preds = hw_fit.forecast(30).values.tolist()
 
     else:  # Linear Regression (or HW fallback)
-        future_preds = lr.predict(make_features(future_dates)).tolist()
+        X_future = make_features(future_dates)
+        future_preds = lr.predict(X_future)
 
-    fig, ax = plt.subplots(figsize=(13, 5))
+    # ── Fig 9: Plot do Forecast ──────────────────────────────────────────────
+    fig, ax = plt.subplots(figsize=(14, 6))
     ax.plot(ts.index[-60:], ts.values[-60:],
-            color="gray", linewidth=1.5, label="Historical (60d)")
+            color="#4A4A4A", linewidth=2, label="Historical Observations", alpha=0.7)
     ax.plot(future_dates, future_preds,
-            color=COLORS[1], linewidth=2, linestyle="--",
+            color=COLORS[1], linewidth=2.5, linestyle="--",
             marker="o", markersize=4,
-            label=f"30-Day Forecast ({best_model})")
-    ax.axvline(ts.index[-1], color="black", linestyle=":", linewidth=1,
-               label="Forecast Start")
-    ax.set_title(f"30-Day Temperature Forecast — {city} ({best_model})",
-                 fontsize=13, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Temperature (°C)")
-    ax.legend()
+            label=f"30-Day Forecast ({best_model_name})")
+
+    ax.axvline(last_date, color="red", linestyle=":",
+               linewidth=1.5, label="Forecast Horizon")
+
+    ax.set_title(f"Temperature Trend Projection — {city}\nSelected Model: {best_model_name} (Best MAE)",
+                 fontsize=14, fontweight="bold", pad=15)
+    ax.set_xlabel("Date", fontsize=11)
+    ax.set_ylabel("Temperature (°C)", fontsize=11)
+    ax.legend(loc="upper left", frameon=True)
+    ax.grid(True, linestyle='--', alpha=0.5)
+
     fig.autofmt_xdate()
     plt.tight_layout()
-    plt.savefig(f"{OUT}/09_future_forecast.png", dpi=150, bbox_inches="tight")
+
+    plt.savefig(f"{OUT}/09_future_forecast.png", dpi=200, bbox_inches="tight")
     plt.close()
-    print("    → Saved 09_future_forecast.png")
+    print(f"    → Saved {OUT}/09_future_forecast.png")
 
     return metrics
 
 # ─────────────────────────────────────────────
 # 5. SUMMARY REPORT
 # ─────────────────────────────────────────────
-
 
 def save_summary(metrics):
     os.makedirs("reports", exist_ok=True)
