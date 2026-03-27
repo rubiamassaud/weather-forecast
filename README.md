@@ -1,10 +1,4 @@
 # 🌍 Weather Trend Forecasting
-**PM Accelerator — AI Engineering Intern Technical Assessment**
-
-> **PM Accelerator Mission:** To provide aspiring product managers and AI professionals with the real-world skills, mentorship, and experience needed to break into and excel in the world of AI product management — through hands-on projects, top-tier mentors, and a global community.
-> 🔗 [pmaccelerator.io](https://www.pmaccelerator.io/)
-
----
 
 ## 📋 Project Overview
 
@@ -15,7 +9,6 @@ This project analyzes the **Global Weather Repository** dataset (Kaggle) to fore
 - ✅ Time series forecasting with 3 models (Linear Regression, Holt-Winters, Random Forest)
 - ✅ Model evaluation with MAE, RMSE, and R²
 - ✅ 30-day ahead forecast
-- ✅ Self-contained HTML report
 
 **Dataset:** [Global Weather Repository - Kaggle](https://www.kaggle.com/datasets/nelgiriyewithana/global-weather-repository/code)
 
@@ -27,7 +20,7 @@ This project analyzes the **Global Weather Repository** dataset (Kaggle) to fore
 weather-forecast/
 ├── data/
 │   └── GlobalWeatherRepository.csv   # Dataset (download from Kaggle)
-├── outputs/                          # Generated plots (auto-created)
+├── outputs/                          # Generated plots (auto-created on run)
 │   ├── 01_distributions.png
 │   ├── 02_monthly_temp_trend.png
 │   ├── 03_precip_heatmap.png
@@ -38,8 +31,7 @@ weather-forecast/
 │   ├── 08_model_metrics.png
 │   └── 09_future_forecast.png
 ├── reports/
-│   ├── weather_report.html           # Full self-contained HTML report
-│   └── summary_report.txt            # Text summary
+│   └── summary_report.txt            # Auto-generated text summary
 ├── analysis.py                       # Main analysis script
 ├── requirements.txt                  # Python dependencies
 └── README.md                         # This file
@@ -83,15 +75,17 @@ Open `reports/weather_report.html` in any browser, it's fully self-contained (no
 | Step | Method | Rationale |
 |---|---|---|
 | Missing values | City-level median imputation | Preserves local climate signal |
-| Outliers | 1st–99th percentile IQR filter | Keeps extreme-but-real events |
+| Outliers | IQR filter (Q1/Q3 ± 3×IQR) | Removes extreme noise while keeping real events |
 | Normalization | Min-max for humidity & UV | Consistent scale for modeling |
 | Feature engineering | month, day_of_year, year, season | Temporal pattern extraction |
 
 ### EDA Highlights
-- **Temperature** follows strong seasonal cycles; Moscow has ~35°C swing winter→summer
+- **Temperature** follows strong seasonal cycles; 
 - **Mumbai** shows clear monsoon signal (Jun–Sep precipitation spike)
 - **UV index ↔ Temperature**: r ≈ +0.45 positive correlation
 - **Cloud cover ↔ Visibility**: r ≈ –0.40 negative correlation
+- **Humidity ↔ Temperature**: negative correlation across most regions
+
 
 ### Forecasting Models
 
@@ -104,7 +98,7 @@ Train/Test split: 80% / 20%
 | Holt-Winters | ~3.2 | ~4.2 | ~0.81 | Additive trend + seasonal smoothing |
 | **Random Forest** ✅ | **~2.7** | **~3.5** | **~0.87** | 14-day lag window, 150 estimators |
 
-**Best model: Random Forest** — captures non-linear autocorrelation between recent days.
+**Best model: Random Forest** — captures non-linear autocorrelation between recent temperature observations and outperforms classical time series methods for short-horizon forecasting.
 
 ---
 
@@ -128,14 +122,7 @@ statsmodels (ExponentialSmoothing / Holt-Winters)
 
 ---
 
-## 📹 Demo Video
-[Link to your demo video here — Google Drive / YouTube / Vimeo]
-
----
-
 ## 👤 Author
 **Rubia Massaud**
 - LinkedIn: [https://www.linkedin.com/in/rubiamassaud/]
 - GitHub: [https://github.com/rubiamassaud]
-
-*Submitted for: PM Accelerator AI Engineering Intern — Spring/Summer 2026*

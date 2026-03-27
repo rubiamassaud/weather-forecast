@@ -1,6 +1,5 @@
 """
-Weather Trend Forecasting - Basic Assessment
-PM Accelerator | AI Engineering Intern Technical Assessment
+Weather Trend Forecasting
 Author: Rubia Massaud dos Santos
 Dataset: Global Weather Repository (Kaggle)
 """
@@ -24,21 +23,6 @@ sns.set_theme(style="whitegrid", palette="muted")
 COLORS = ["#3A86FF", "#FF006E", "#FB5607", "#FFBE0B", "#8338EC", "#06D6A0"]
 OUT = "outputs"
 os.makedirs(OUT, exist_ok=True)
-
-# ─────────────────────────────────────────────
-# 0. PM ACCELERATOR MISSION BANNER
-# ─────────────────────────────────────────────
-
-
-def print_banner():
-    print("=" * 70)
-    print("  PM ACCELERATOR")
-    print("  Mission: To provide aspiring product managers and AI professionals")
-    print("  with the real-world skills, mentorship, and experience needed to")
-    print("  break into and excel in the world of AI product management.")
-    print("  https://www.pmaccelerator.io/")
-    print("=" * 70)
-    print()
 
 # ─────────────────────────────────────────────
 # 1. LOAD DATA
