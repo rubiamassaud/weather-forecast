@@ -252,7 +252,7 @@ def build_models(df):
 
     # Select city with most daily observations (minimum 60)
     MIN_OBS = 60
-    city = "New York"
+    city = "Abu Dhabi"
     ts = (df[df["location_name"] == city]
           .set_index("last_updated")
           .resample("D")["temperature_celsius"]

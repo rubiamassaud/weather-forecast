@@ -89,7 +89,7 @@ Open `reports/weather_report.html` in any browser, it's fully self-contained (no
 
 ### Forecasting Models
 
-Target: Daily average temperature — **New York City** (1,096 observations, 2022–2024)
+Target: Daily average temperature — **Abu Dhabi** (1,096 observations, 2022–2024)
 Train/Test split: 80% / 20%
 
 | Model | MAE (°C) | RMSE (°C) | R² | Method |
