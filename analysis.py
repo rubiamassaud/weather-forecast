@@ -545,7 +545,6 @@ def save_summary(metrics):
 # MAIN
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
-    print_banner()
     df = load_data()
     df = clean_data(df)
     eda(df)
